@@ -1,0 +1,109 @@
+let pos, projMat, origin, canvas, ctx, objects = [];
+
+// now, dt, t0
+const time = {};
+const velocity = {x:0, y:0, z:150};
+
+class Vector {
+
+	constructor(x=0, y=0, z=0, w=0) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		this.w = w;
+	}
+
+	project(projMat) {
+		let projected = new Vector();
+		projected.x = this.x * projMat[0][0] + this.y * projMat[1][0] + 
+			this.z * projMat[2][0] + this.w * projMat[3][0];
+		projected.y = this.x * projMat[0][1] + this.y * projMat[1][1] + 
+			this.z * projMat[2][1] + this.w * projMat[3][1];
+		projected.z = this.x * projMat[0][2] + this.y * projMat[1][2] + 
+			this.z * projMat[2][2] + this.w * projMat[3][2];
+		projected.w = this.x * projMat[0][3] + this.y * projMat[1][3] + 
+			this.z * projMat[2][3] + this.w * projMat[3][3];
+		if(projected.w != 0) {
+			projected.x /= projected.w;
+			projected.y /= projected.w;
+			projected.z /= projected.w;
+		};
+		return projected;
+	}
+
+	scaleToView(origin) {
+		this.x += 1.0;
+		this.y += 1.0;
+		this.x *= origin.x;
+		this.y *= origin.y;
+	}
+
+}
+
+const update = () => {
+	time.now = new Date().getTime();
+	time.dt = Math.abs(time.now - time.t0) * 0.001;
+	time.t0 = time.now;
+
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+	objects.sort((a, b) => a.z < b.z);
+
+	objects.forEach((obj, i) => {
+		obj.z -= velocity.z * time.dt;
+		if(obj.z <= 0.1) obj.z = 4000;
+		let projected = obj.project(projMat);
+		let scale = 1000 / (1000 + projected.w);
+		let size = 4 * scale;
+		let transparency = 1 * scale;
+		projected.scaleToView(origin);
+		ctx.save();
+		ctx.fillStyle = "white";
+		ctx.globalAlpha = transparency;
+		ctx.beginPath();
+		ctx.arc(projected.x, projected.y, size, 0, 2*Math.PI);
+		ctx.closePath();
+		ctx.fill();
+		ctx.restore();
+	});
+
+	requestAnimationFrame(update);
+};
+
+const random = (min, max) => Math.random() * (max - min + 1) + min;
+
+addEventListener("load", () => {
+	canvas = document.getElementById("canvas");
+	canvas.width = innerWidth;
+	canvas.height = innerHeight;
+	canvas.style.backgroundColor = "#000";
+	ctx = canvas.getContext("2d");
+
+	origin = {x:canvas.width/2, y:canvas.height/2};
+
+	const aspectRatio = innerHeight / innerWidth;
+	const zNear = 0.1;
+	const zFar = 1000.0;
+	const fov = 30.0;
+	const fovRad = 1 / Math.tan(fov / 2 * Math.PI / 180.0);
+	const q = zFar / (zFar - zNear);
+
+	projMat = [
+		[aspectRatio * fovRad, 0, 0, 0],
+		[0, fovRad, 0, 0],
+		[0, 0, q, 1],
+		[0, 0, -zNear * q, 0]
+	];
+
+	pos = new Vector(0.5, 0.5, 90);
+
+	for(let x=0; x < 800; x++) {
+		let x = random(-origin.x, origin.x);
+		let y = random(-origin.y, origin.y);
+		let z = random(0, 4000);
+		objects.push(new Vector(x, y, z));
+	};
+
+	time.t0 = new Date().getTime();
+	requestAnimationFrame(update);
+}); 
